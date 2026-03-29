@@ -2,195 +2,207 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-
-  <!-- Mobile / iOS basics -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Reminders" />
 
-  <!-- Manifest (you already added in step 2) -->
   <link rel="manifest" href="./manifest.webmanifest">
-
   <title>Reminders</title>
 
   <style>
     :root { --bg:#000; --card:#1c1c1e; --accent:#0a84ff; --danger:#ff453a; --text:#fff; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       margin: 0;
       padding: 20px;
+      padding-bottom: 120px;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding-bottom: 100px;
+      justify-content: center;
     }
-    .container { width: 100%; max-width: 420px; }
+    .container { width:100%; max-width:420px; }
 
-    h1 { margin-top: 40px; font-size: 32px; letter-spacing: -1px; }
+    h1 { margin-top:40px; font-size:32px; }
 
     .warning {
-      background: #2c2c2e;
-      border-left: 3px solid #ff9f0a;
-      border-radius: 12px;
-      padding: 12px 16px;
-      font-size: 13px;
-      color: #8e8e93;
-      margin-bottom: 16px;
-      line-height: 1.5;
+      background:#2c2c2e;
+      border-left:3px solid #ff9f0a;
+      border-radius:12px;
+      padding:12px 16px;
+      font-size:13px;
+      color:#8e8e93;
+      margin-bottom:16px;
     }
 
     .input-group {
-      background: var(--card);
-      padding: 20px;
-      border-radius: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      background:var(--card);
+      padding:20px;
+      border-radius:24px;
+      margin-bottom:20px;
     }
 
     input {
-      width: 100%;
-      background: #2c2c2e;
-      border: none;
-      border-radius: 12px;
-      padding: 15px;
-      color: white;
-      font-size: 17px;
-      margin-bottom: 12px;
-      box-sizing: border-box;
-      outline: none;
+      width:100%;
+      background:#2c2c2e;
+      border:none;
+      border-radius:12px;
+      padding:14px;
+      color:white;
+      font-size:16px;
+      margin-bottom:12px;
     }
 
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
 
     button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 16px;
-      border-radius: 14px;
-      font-weight: 600;
-      font-size: 16px;
-      transition: 0.2s;
-      cursor: pointer;
-      width: 100%;
+      background:var(--accent);
+      border:none;
+      color:white;
+      padding:14px;
+      border-radius:14px;
+      font-size:16px;
+      font-weight:600;
     }
-    button:active { transform: scale(0.96); opacity: 0.8; }
+    .secondary { background:#3a3a3c; }
+    .record { background:var(--danger); }
 
-    .secondary { background: #3a3a3c; }
-
-    .list { width: 100%; }
-    .item {
-      background: var(--card);
-      padding: 18px;
-      border-radius: 20px;
-      margin-bottom: 12px;
-      border: 1px solid #2c2c2e;
+    .list .item {
+      background:var(--card);
+      padding:16px;
+      border-radius:18px;
+      margin-bottom:12px;
     }
-    .item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
-    .time-label { font-size: 13px; color: #8e8e93; margin-top: 4px; }
+    .time { font-size:13px; color:#8e8e93; }
 
-    /* Toast */
+    /* Overlay */
+    #alarm {
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.9);
+      z-index:999;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+    }
+    #alarm h2 { color:var(--danger); font-size:38px; }
+    #alarm button { margin-top:20px; background:var(--danger); font-size:22px; }
+
     .toast {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: #2c2c2e;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 20px;
-      font-size: 15px;
-      opacity: 0;
-      transition: all 0.3s;
-      pointer-events: none;
-      z-index: 999;
+      position:fixed;
+      bottom:30px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#2c2c2e;
+      padding:10px 20px;
+      border-radius:16px;
+      opacity:0;
+      transition:.3s;
     }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* Alarm Overlay */
-    #alarmOverlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.92);
-      z-index: 1000;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    #alarmOverlay h2 {
-      color: var(--danger);
-      font-size: 40px;
-      margin: 0 0 10px 0;
-    }
-    #alarmOverlay p {
-      font-size: 18px;
-      color: #fff;
-      margin: 0 0 18px 0;
-      opacity: 0.9;
-    }
-    #dismissBtn {
-      background: var(--danger);
-      padding: 18px 56px;
-      font-size: 22px;
-      width: auto;
-    }
+    .toast.show { opacity:1; }
   </style>
 </head>
 
 <body>
-  <!-- Alarm Overlay -->
-  <div id="alarmOverlay">
-    <h2 id="alarmTitle">ALARM!</h2>
-    <p id="alarmSub"></p>
-    <button id="dismissBtn" onclick="stopAlarm()">DISMISS</button>
+<div class="container">
+  <h1>Reminders</h1>
+
+  <div class="warning">
+    ⚠️ Alarm beeps only while app is open. Push will come later.
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="input-group">
+    <input id="task" placeholder="Memo name…" />
+    <input id="time" type="datetime-local" />
 
-  <div class="container">
-    <h1>Reminders</h1>
-
-    <div class="warning">
-      ⚠️ Important: iPhone will beep only while this app is open (iOS stops background JS). Later we’ll add Push Notifications for closed-app alerts.
+    <div class="row">
+      <button class="secondary" onclick="quick(1)">+1h</button>
+      <button class="secondary" onclick="quick(2)">+2h</button>
     </div>
 
-    <div class="input-group">
-      <input type="text" id="taskInput" placeholder="Memo name..." />
-      <input type="datetime-local" id="timeInput" />
-
-      <div class="row">
-        <button class="secondary" onclick="setQuickTime(1)">+1h</button>
-        <button class="secondary" onclick="setQuickTime(2)">+2h</button>
-      </div>
-
-      <button onclick="addReminder()">Save</button>
+    <div class="row">
+      <button class="record" onclick="record()">🎤 Record</button>
+      <button onclick="save()">Save</button>
     </div>
-
-    <div id="list" class="list"></div>
   </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<div id="alarm">
+  <h2 id="alarmTitle"></h2>
+  <button onclick="stop()">DISMISS</button>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-/* =========================
-   v1 core reminders (one-time)
-   ========================= */
-const STORAGE_KEY = "rems_v1_core";
+const KEY="rems_v2";
+let audioCtx, beep, recorder, chunks=[], voice=null;
 
-/* Minimum datetime: now */
-function updateMinTime() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-    .toISOString().slice(0, 16);
-  document.getElementById("timeInput").min = local;
+const toast=m=>{const t=toastEl;t.innerText=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)};
+const toastEl=document.getElementById("toast");
+
+function quick(h){
+  const d=new Date(); d.setHours(d.getHours()+h);
+  time.value=new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
 }
-updateMinTime();
-setInterval(updateMinTime, 60000);
 
-function showToast(msg) {
+function save(){
+  if(!time.value){toast("Pick a time");return}
+  const r={id:Date.now(),t:task.value||"Reminder",ms:new Date(time.value).getTime(),v:voice};
+  const a=JSON.parse(localStorage.getItem(KEY)||"[]"); a.push(r);
+  localStorage.setItem(KEY,JSON.stringify(a));
+  task.value=""; time.value=""; voice=null;
+  toast("Saved ✅"); render();
+}
+
+function render(){
+  list.innerHTML="";
+  const a=JSON.parse(localStorage.getItem(KEY)||"[]").sort((x,y)=>x.ms-y.ms);
+  a.forEach(r=>{
+    list.innerHTML+=`<div class="item"><b>${r.t}</b><div class="time">${new Date(r.ms).toLocaleString()}</div></div>`;
+  });
+}
+
+function tick(){
+  const a=JSON.parse(localStorage.getItem(KEY)||"[]");
+  const n=Date.now();
+  const r=a.find(x=>x.ms<=n);
+  if(!r) return;
+  localStorage.setItem(KEY,JSON.stringify(a.filter(x=>x.id!==r.id)));
+  alarmTitle.innerText=r.t;
+  alarm.style.display="flex";
+  audioCtx=new AudioContext();
+  beep=setInterval(()=>{
+    const o=audioCtx.createOscillator();
+    o.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.3);
+  },600);
+}
+
+function stop(){
+  clearInterval(beep); alarm.style.display="none"; render();
+}
+
+async function record(){
+  if(recorder&&recorder.state==="recording"){
+    recorder.stop(); return;
+  }
+  const s=await navigator.mediaDevices.getUserMedia({audio:true});
+  recorder=new MediaRecorder(s);
+  chunks=[];
+  recorder.ondataavailable=e=>chunks.push(e.data);
+  recorder.onstop=()=>{voice=new Blob(chunks); toast("Voice saved 🎤")};
+  recorder.start(); toast("Recording…");
+}
+
+setInterval(tick,1000);
+render();
+</script>
+</body>
+</html>
