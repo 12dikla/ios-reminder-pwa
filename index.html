@@ -1,109 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Reminders</title>
 
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Reminders" />
+<style>
+:root {
+  --bg:#000;
+  --card:#1c1c1e;
+  --accent:#0a84ff;
+  --danger:#ff453a;
+}
 
-  <title>Reminders</title>
+body {
+  font-family:-apple-system,sans-serif;
+  background:var(--bg);
+  color:#fff;
+  margin:0;
+  padding:20px 20px 140px;
+  display:flex;
+  justify-content:center;
+}
 
-  <style>
-    :root {
-      --bg:#000;
-      --card:#1c1c1e;
-      --accent:#0a84ff;
-      --danger:#ff453a;
-      --text:#fff;
-    }
+.container {
+  width:100%;
+  max-width:420px;
+}
 
-    body {
-      font-family:-apple-system,sans-serif;
-      background:var(--bg);
-      color:var(--text);
-      margin:0;
-      padding:20px 20px 120px;
-      display:flex;
-      justify-content:center;
-    }
+h1 {
+  margin:40px 0 16px;
+  font-size:32px;
+}
 
-    .container {
-      width:100%;
-      max-width:420px;
-    }
+.card {
+  background:var(--card);
+  padding:20px;
+  border-radius:24px;
+}
 
-    h1 {
-      margin:40px 0 16px;
-      font-size:32px;
-    }
+textarea, input, button {
+  width:100%;
+  border:none;
+  border-radius:14px;
+  padding:16px;
+  font-size:16px;
+  margin-bottom:12px;
+  box-sizing:border-box;
+}
 
-    .card {
-      background:var(--card);
-      padding:20px;
-      border-radius:24px;
-    }
+textarea, input {
+  background:#2c2c2e;
+  color:#fff;
+}
 
-    input, button {
-      width:100%;
-      border:none;
-      border-radius:14px;
-      padding:16px;
-      font-size:16px;
-      margin-bottom:12px;
-      box-sizing:border-box;
-    }
+textarea {
+  min-height:70px;
+  resize:none;
+}
 
-    input {
-      background:#2c2c2e;
-      color:white;
-    }
+button {
+  background:var(--accent);
+  color:#fff;
+  font-weight:600;
+}
 
-    input[type="datetime-local"] {
-      color:#fff;
-    }
+.danger { background:var(--danger); }
+.secondary { background:#3a3a3c; }
 
-    button {
-      font-weight:600;
-      color:white;
-      background:var(--accent);
-    }
+.list .item {
+  background:var(--card);
+  padding:16px;
+  border-radius:18px;
+  margin-top:12px;
+}
 
-    .danger {
-      background:var(--danger);
-    }
+.time {
+  font-size:13px;
+  color:#8e8e93;
+  margin-top:4px;
+}
 
-    .secondary {
-      background:#3a3a3c;
-    }
+/* Alarm */
+#alarm {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.9);
+  z-index:999;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+}
 
-    button:disabled {
-      opacity:0.5;
-    }
+#alarm h2 {
+  color:var(--danger);
+  font-size:38px;
+}
 
-    /* Alarm */
-    #alarm {
-      display:none;
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.9);
-      z-index:999;
-      flex-direction:column;
-      justify-content:center;
-      align-items:center;
-      text-align:center;
-    }
-
-    #alarm h2 {
-      font-size:38px;
-      color:var(--danger);
-    }
-
-    #alarm button {
-      margin-top:12px;
-    }
-  </style>
+#alarm button {
+  margin-top:12px;
+  width:auto;
+  padding:14px 32px;
+}
+</style>
 </head>
 
 <body>
@@ -111,18 +114,146 @@
   <h1>Reminders</h1>
 
   <div class="card">
-    <input id="task" placeholder="Memo name…" />
+    <textarea id="task" placeholder="Memo…"></textarea>
 
-    <!-- Native iOS date & time picker -->
-    <input id="time" type="datetime-local" />
+    <!-- Native iOS date + time -->
+    <input id="time" type="datetime-local">
 
-    <button id="startRec" class="danger" onclick="startRecording()">🎤 Start Recording</button>
-    <button id="stopRec" class="secondary" onclick="stopRecording()" disabled>⏹ Stop Recording</button>
+    <button id="startRec" class="danger">🎤 Start recording</button>
+    <button id="stopRec" class="secondary" disabled>⏹ Stop recording</button>
 
-    <button onclick="save()">Save</button>
+    <button id="saveBtn">Save</button>
   </div>
+
+  <div class="list" id="list"></div>
 </div>
 
-<!-- Alarm -->
 <div id="alarm">
-  <h2 id="alarmTitle"></h2>
+  <h2 id="alarmText"></h2>
+  <button class="secondary" id="snoozeBtn">Snooze 5 min</button>
+  <button class="danger" id="dismissBtn">DISMISS</button>
+</div>
+
+<script>
+/* ---------------- State ---------------- */
+const STORAGE_KEY = "reminders_v1";
+let mediaRecorder = null;
+let audioChunks = [];
+let beepTimer = null;
+let currentAlarm = null;
+
+/* ---------------- Recording ---------------- */
+startRec.onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => stream.getTracks().forEach(t => t.stop());
+
+    mediaRecorder.start();
+    startRec.disabled = true;
+    stopRec.disabled = false;
+  } catch {
+    alert("Microphone permission denied");
+  }
+};
+
+stopRec.onclick = () => {
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+  }
+  startRec.disabled = false;
+  stopRec.disabled = true;
+};
+
+/* ---------------- Save ---------------- */
+saveBtn.onclick = () => {
+  if (!time.value) {
+    alert("Please choose date & time");
+    return;
+  }
+
+  const reminder = {
+    id: Date.now(),
+    text: task.value || "Reminder",
+    time: new Date(time.value).getTime()
+  };
+
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  all.push(reminder);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+
+  task.value = "";
+  time.value = "";
+
+  render();
+};
+
+/* ---------------- Render ---------------- */
+function render() {
+  const list = document.getElementById("list");
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
+    .sort((a,b) => a.time - b.time);
+
+  list.innerHTML = "";
+
+  all.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <strong>${r.text}</strong>
+      <div class="time">${new Date(r.time).toLocaleString()}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+/* ---------------- Alarm ---------------- */
+setInterval(() => {
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const now = Date.now();
+  const due = all.find(r => r.time <= now);
+  if (!due) return;
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(all.filter(r => r.id !== due.id))
+  );
+
+  triggerAlarm(due.text);
+  render();
+}, 1000);
+
+function triggerAlarm(text) {
+  currentAlarm = text;
+  alarmText.textContent = text;
+  alarm.style.display = "flex";
+
+  beepTimer = setInterval(() => {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + .3);
+  }, 600);
+}
+
+dismissBtn.onclick = () => {
+  clearInterval(beepTimer);
+  alarm.style.display = "none";
+};
+
+snoozeBtn.onclick = () => {
+  clearInterval(beepTimer);
+  alarm.style.display = "none";
+  setTimeout(() => triggerAlarm(currentAlarm), 5 * 60 * 1000);
+};
+
+/* Boot */
+render();
+</script>
+</body>
+</html>
+``
