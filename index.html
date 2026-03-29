@@ -1,247 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Reminders" />
+  <title>Reminders</title>
 
-<title>Reminders</title>
+  <style>
+    :root{
+      --bg:#000; --card:#1c1c1e; --field:#2c2c2e;
+      --accent:#0a84ff; --danger:#ff453a; --muted:#8e8e93; --text:#fff;
+    }
+    body{
+      margin:0; padding:20px 20px 140px; background:var(--bg); color:var(--text);
+      font-family:-apple-system,system-ui,sans-serif; display:flex; justify-content:center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .container{ width:100%; max-width:420px; }
+    h1{ margin:40px 0 10px; font-size:32px; }
+    .build{ color:var(--muted); font-size:12px; margin-bottom:16px; }
+    .card{ background:var(--card); padding:20px; border-radius:24px; }
 
-<style>
-:root {
-  --bg:#000;
-  --card:#1c1c1e;
-  --accent:#0a84ff;
-  --danger:#ff453a;
-  --text:#fff;
-  --muted:#8e8e93;
-}
+    label{ display:block; color:var(--muted); font-size:13px; margin:6px 0 6px; }
+    .hint{ color:var(--muted); font-size:12px; margin-top:-8px; margin-bottom:12px; }
 
-body {
-  margin:0;
-  padding:20px 20px 120px;
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,sans-serif;
-  display:flex;
-  justify-content:center;
-}
+    textarea,input,button{
+      width:100%; box-sizing:border-box; border:none; border-radius:14px;
+      padding:16px; font-size:16px; margin-bottom:12px;
+    }
+    textarea,input{ background:var(--field); color:var(--text); outline:none; }
+    textarea{ min-height:78px; resize:none; }
 
-.container {
-  width:100%;
-  max-width:420px;
-}
+    /* make datetime look more "real" */
+    input[type="datetime-local"]{ appearance:auto; -webkit-appearance:auto; }
 
-h1 {
-  margin:40px 0 16px;
-  font-size:32px;
-}
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    button{ background:var(--accent); color:#fff; font-weight:700; }
+    .danger{ background:var(--danger); }
+    .secondary{ background:#3a3a3c; }
+    button:disabled{ opacity:.5; }
 
-.card {
-  background:var(--card);
-  padding:20px;
-  border-radius:24px;
-}
+    .list{ margin-top:16px; }
+    .item{ background:var(--card); padding:16px; border-radius:18px; margin-bottom:12px; border:1px solid #2c2c2e; }
+    .time{ color:var(--muted); font-size:13px; margin-top:4px; }
+    .del{ width:auto; padding:8px 14px; font-size:14px; border-radius:12px; background:#3a3a3c; }
+    .itemHead{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
 
-label {
-  display:block;
-  font-size:13px;
-  color:var(--muted);
-  margin-bottom:6px;
-}
+    /* Alarm overlay */
+    #alarm{
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:9999;
+      flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px;
+    }
+    #alarm h2{ color:var(--danger); font-size:40px; margin:0 0 10px; }
+    #alarm p{ color:#fff; opacity:.9; margin:0 0 18px; }
+    #alarm .actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    #alarm .actions button{ width:auto; padding:14px 22px; font-size:18px; border-radius:14px; margin-bottom:0; }
 
-textarea,
-input,
-button {
-  width:100%;
-  box-sizing:border-box;
-  border:none;
-  border-radius:14px;
-  padding:16px;
-  font-size:16px;
-  margin-bottom:12px;
-}
-
-textarea,
-input {
-  background:#2c2c2e;
-  color:#fff;
-}
-
-textarea {
-  min-height:70px;
-  resize:none;
-}
-
-button {
-  background:var(--accent);
-  color:#fff;
-  font-weight:600;
-}
-
-.list {
-  margin-top:20px;
-}
-
-.item {
-  background:var(--card);
-  padding:16px;
-  border-radius:18px;
-  margin-bottom:12px;
-}
-
-.time {
-  font-size:13px;
-  color:var(--muted);
-  margin-top:4px;
-}
-
-/* Alarm */
-#alarm {
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.9);
-  z-index:999;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-}
-
-#alarm h2 {
-  color:var(--danger);
-  font-size:38px;
-  margin-bottom:12px;
-}
-
-#alarm button {
-  margin-top:12px;
-  width:auto;
-  padding:14px 32px;
-}
-</style>
+    /* Toast */
+    .toast{
+      position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(10px);
+      background:#2c2c2e; color:#fff; padding:10px 18px; border-radius:16px;
+      opacity:0; transition:.25s; pointer-events:none; z-index:10000;
+    }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  </style>
 </head>
 
 <body>
-<div class="container">
-  <h1>Reminders</h1>
+  <div class="container">
+    <h1>Reminders</h1>
+    <div class="build">Build: <b>v2026-03-30-0141</b></div>
 
-  <div class="card">
-    <label>Memo</label>
-    <textarea id="task" placeholder="Write a note…"></textarea>
+    <div class="card">
+      <label>Memo</label>
+      <textarea id="task" placeholder="Write a note…"></textarea>
 
-    <label>Date & Time</label>
-    <input id="time" type="datetime-local" />
+      <label>Date &amp; Time</label>
+      <input id="time" type="datetime-local" />
+      <div class="hint">Tap the gray bar to choose date + hours + minutes</div>
 
-    <button id="saveBtn">Save</button>
+      <div class="row">
+        <button id="startRec" class="danger" type="button">🎤 Start</button>
+        <button id="stopRec" class="secondary" type="button" disabled>⏹ Stop</button>
+      </div>
+
+      <button id="saveBtn" type="button">Save</button>
+    </div>
+
+    <div class="list" id="list"></div>
   </div>
 
-  <div class="list" id="list"></div>
-</div>
+  <div id="alarm">
+    <h2 id="alarmTitle">ALARM</h2>
+    <p id="alarmTime"></p>
+    <div class="actions">
+      <button id="snoozeBtn" class="secondary" type="button">Snooze 5 min</button>
+      <button id="dismissBtn" class="danger" type="button">DISMISS</button>
+    </div>
+  </div>
 
-<div id="alarm">
-  <h2 id="alarmText"></h2>
-  <button id="snoozeBtn">Snooze 5 min</button>
-  <button id="dismissBtn">DISMISS</button>
-</div>
+  <div class="toast" id="toast"></div>
 
 <script>
-/* ---------- State ---------- */
-const STORAGE_KEY = "reminders_clean_v1";
-let audioCtx = null;
-let beepInterval = null;
-let currentAlarmText = null;
+(() => {
+  const STORAGE_KEY = "reminders_stable_v1";
+  const $ = (id) => document.getElementById(id);
 
-/* ---------- Audio unlock (iOS critical) ---------- */
-function unlockAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
-}
-document.addEventListener("click", unlockAudio, { once:true });
-document.addEventListener("touchstart", unlockAudio, { once:true });
+  const taskEl = $("task");
+  const timeEl = $("time");
+  const listEl = $("list");
+  const toastEl = $("toast");
 
-/* ---------- Save ---------- */
-document.getElementById("saveBtn").onclick = () => {
-  const text = document.getElementById("task").value.trim();
-  const timeValue = document.getElementById("time").value;
+  const startRecBtn = $("startRec");
+  const stopRecBtn  = $("stopRec");
+  const saveBtn     = $("saveBtn");
 
-  if (!timeValue) {
-    alert("Please choose Date & Time");
-    return;
+  const alarmEl     = $("alarm");
+  const alarmTitle  = $("alarmTitle");
+  const alarmTime   = $("alarmTime");
+  const snoozeBtn   = $("snoozeBtn");
+  const dismissBtn  = $("dismissBtn");
+
+  // ---------- Toast
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(() => toastEl.classList.remove("show"), 2200);
   }
 
-  const reminder = {
-    id: Date.now(),
-    text: text || "Reminder",
-    time: new Date(timeValue).getTime()
+  // ---------- Set min datetime to now
+  function updateMin(){
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    timeEl.min = local;
+  }
+  updateMin();
+  setInterval(updateMin, 60000);
+
+  // ---------- Audio unlock for iOS
+  let audioCtx = null;
+  let beepInterval = null;
+
+  function ensureAudio(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+  }
+
+  // unlock on first user gesture
+  window.addEventListener("touchstart", ensureAudio, { once:true });
+  window.addEventListener("click", ensureAudio, { once:true });
+
+  function startBeep(){
+    ensureAudio();
+    if(beepInterval) return;
+    beepInterval = setInterval(() => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    }, 600);
+  }
+
+  function stopBeep(){
+    if(beepInterval){ clearInterval(beepInterval); beepInterval = null; }
+  }
+
+  // ---------- Storage helpers
+  function getAll(){
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  }
+  function setAll(arr){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+
+  // ---------- Render
+  function render(){
+    const all = getAll().sort((a,b)=>a.timeMs-b.timeMs);
+    if(all.length === 0){
+      listEl.innerHTML = `<p style="text-align:center;color:#8e8e93;margin-top:18px;">No reminders yet.</p>`;
+      return;
+    }
+    listEl.innerHTML = all.map(r => `
+      <div class="item">
+        <div class="itemHead">
+          <div>
+            <strong>${escapeHtml(r.text)}</strong>
+            <div class="time">${new Date(r.timeMs).toLocaleString()}</div>
+          </div>
+          <button class="del" type="button" onclick="window.__del(${r.id})">Delete</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  // expose delete for inline button
+  window.__del = (id) => {
+    setAll(getAll().filter(r => r.id !== id));
+    toast("Deleted");
+    render();
   };
 
-  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  all.push(reminder);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  // ---------- Save
+  saveBtn.addEventListener("click", () => {
+    const timeValue = timeEl.value;
+    if(!timeValue){
+      toast("Choose Date & Time");
+      return;
+    }
+    const ms = new Date(timeValue).getTime();
+    if(ms <= Date.now()){
+      toast("Pick a future time");
+      return;
+    }
 
-  document.getElementById("task").value = "";
-  document.getElementById("time").value = "";
+    const text = taskEl.value.trim() || "Reminder";
+    const reminder = { id: Date.now(), text, timeMs: ms };
 
-  render();
-};
+    const all = getAll();
+    all.push(reminder);
+    setAll(all);
 
-/* ---------- Render ---------- */
-function render() {
-  const list = document.getElementById("list");
-  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
-    .sort((a,b) => a.time - b.time);
+    taskEl.value = "";
+    timeEl.value = "";
 
-  list.innerHTML = "";
-
-  all.forEach(r => {
-    const div = document.createElement("div");
-    div.className = "item";
-    div.innerHTML = `
-      <strong>${r.text}</strong>
-      <div class="time">${new Date(r.time).toLocaleString()}</div>
-    `;
-    list.appendChild(div);
+    toast("Saved ✅");
+    render();
   });
-}
 
-/* ---------- Alarm check ---------- */
-setInterval(() => {
-  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  const now = Date.now();
-  const due = all.find(r => r.time <= now);
-  if (!due) return;
+  // ---------- Alarm logic (one-time)
+  let alarmActive = false;
+  let currentAlarmText = "";
 
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(all.filter(r => r.id !== due.id))
-  );
+  function showAlarm(text, ms){
+    alarmActive = true;
+    currentAlarmText = text;
+    alarmTitle.textContent = text;
+    alarmTime.textContent = new Date(ms).toLocaleString();
+    alarmEl.style.display = "flex";
+    startBeep();
+  }
 
-  triggerAlarm(due.text);
+  function hideAlarm(){
+    stopBeep();
+    alarmEl.style.display = "none";
+    alarmActive = false;
+  }
+
+  dismissBtn.addEventListener("click", () => {
+    hideAlarm();
+    render();
+  });
+
+  snoozeBtn.addEventListener("click", () => {
+    hideAlarm();
+    const all = getAll();
+    all.push({ id: Date.now(), text: currentAlarmText, timeMs: Date.now() + 5*60*1000 });
+    setAll(all);
+    toast("Snoozed 5 min");
+    render();
+  });
+
+  setInterval(() => {
+    if(alarmActive) return;
+    const all = getAll();
+    const now = Date.now();
+    const due = all.filter(r => r.timeMs <= now).sort((a,b)=>a.timeMs-b.timeMs)[0];
+    if(!due) return;
+
+    // remove first (one-time)
+    setAll(all.filter(r => r.id !== due.id));
+    render();
+    showAlarm(due.text, due.timeMs);
+  }, 1000);
+
+  // ---------- Recording (Start/Stop)
+  let mediaRecorder = null;
+  let isRecording = false;
+
+  startRecBtn.addEventListener("click", async () => {
+    try{
+      // iOS likes direct gesture => this is direct click handler
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+
+      // choose a supported mime if possible
+      let options = {};
+      const candidates = ["audio/mp4", "audio/webm"];
+      for(const t of candidates){
+        if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)){
+          options = { mimeType: t };
+          break;
+        }
+      }
+
+      mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorder.onstop = () => stream.getTracks().forEach(t => t.stop());
+
+      mediaRecorder.start();
+      isRecording = true;
+      startRecBtn.disabled = true;
+      stopRecBtn.disabled = false;
+      toast("Recording…");
+
+    } catch(e){
+      console.error(e);
+      toast("Mic permission blocked");
+    }
+  });
+
+  stopRecBtn.addEventListener("click", () => {
+    try{
+      if(mediaRecorder && isRecording){
+        mediaRecorder.stop();
+      }
+    } finally {
+      isRecording = false;
+      startRecBtn.disabled = false;
+      stopRecBtn.disabled = true;
+      toast("Recording stopped");
+    }
+  });
+
+  // boot
   render();
-}, 1000);
-
-/* ---------- Alarm ---------- */
-function triggerAlarm(text) {
-  unlockAudio();
-
-  currentAlarmText = text;
-  document.getElementById("alarmText").innerText = text;
-  document.getElementById("alarm").style.display = "flex";
-
-  beepInterval = setInterval(() => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.3);
+})();
+</script>
+</body>
+</html>
