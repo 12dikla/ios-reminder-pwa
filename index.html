@@ -8,108 +8,81 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Reminders" />
 
-  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="manifest" href="./manifest.webmanifest">
   <title>Reminders</title>
 
   <style>
     :root { --bg:#000; --card:#1c1c1e; --accent:#0a84ff; --danger:#ff453a; --text:#fff; }
 
-    body {
-      font-family: -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 20px;
-      padding-bottom: 120px;
-      display: flex;
-      justify-content: center;
-    }
+    body { font-family:-apple-system,sans-serif; background:var(--bg); color:var(--text);
+      margin:0; padding:20px 20px 120px; display:flex; justify-content:center; }
     .container { width:100%; max-width:420px; }
+    h1 { margin:40px 0 14px; font-size:32px; }
 
-    h1 { margin-top:40px; font-size:32px; }
+    .warning { background:#2c2c2e; border-left:3px solid #ff9f0a; border-radius:12px;
+      padding:12px 16px; font-size:13px; color:#8e8e93; margin-bottom:16px; line-height:1.5; }
 
-    .warning {
-      background:#2c2c2e;
-      border-left:3px solid #ff9f0a;
-      border-radius:12px;
-      padding:12px 16px;
-      font-size:13px;
-      color:#8e8e93;
-      margin-bottom:16px;
+    .input-group { background:var(--card); padding:20px; border-radius:24px; margin-bottom:18px; }
+
+    label { display:block; font-size:13px; color:#8e8e93; margin:6px 0 6px; }
+
+    input[type="text"] {
+      width:100%; background:#2c2c2e; border:none; border-radius:12px; padding:14px;
+      color:#fff; font-size:16px; margin-bottom:12px; outline:none;
     }
 
-    .input-group {
-      background:var(--card);
-      padding:20px;
-      border-radius:24px;
-      margin-bottom:20px;
-    }
-
-    label {
-      font-size:13px;
-      color:#8e8e93;
-      display:block;
-      margin:6px 0 6px;
-    }
-
-    input {
+    .pickerBtn {
       width:100%;
       background:#2c2c2e;
       border:none;
       border-radius:12px;
       padding:14px;
-      color:white;
+      color:#fff;
       font-size:16px;
+      text-align:left;
       margin-bottom:12px;
     }
+    .pickerBtn .sub { color:#8e8e93; font-size:13px; display:block; margin-top:4px; }
+
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
     button {
+      border:none; border-radius:14px; padding:14px;
+      font-size:16px; font-weight:600; color:#fff; width:100%;
       background:var(--accent);
-      border:none;
-      color:white;
-      padding:14px;
-      border-radius:14px;
-      font-size:16px;
-      font-weight:600;
-      width:100%;
     }
-    .record { background:var(--danger); margin-bottom:10px; }
+    button:active { transform: scale(0.98); opacity:0.9; }
 
-    .list .item {
-      background:var(--card);
-      padding:16px;
-      border-radius:18px;
-      margin-bottom:12px;
-    }
-    .time { font-size:13px; color:#8e8e93; }
+    .secondary { background:#3a3a3c; }
+    .record { background:var(--danger); }
+    .recording { background:#ff7069; }
 
-    /* Overlay */
+    .list .item { background:var(--card); padding:16px; border-radius:18px; margin-bottom:12px; border:1px solid #2c2c2e; }
+    .item-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .time { font-size:13px; color:#8e8e93; margin-top:4px; }
+    .delBtn { width:auto; padding:8px 14px; font-size:14px; background:#3a3a3c; border-radius:12px; }
+    audio { width:100%; margin-top:10px; height:34px; filter: invert(1); }
+
+    /* Alarm Overlay */
     #alarm {
-      display:none;
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.9);
-      z-index:999;
-      flex-direction:column;
-      justify-content:center;
-      align-items:center;
-      text-align:center;
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9);
+      z-index:999; flex-direction:column; justify-content:center; align-items:center; text-align:center;
+      padding:20px; box-sizing:border-box;
     }
-    #alarm h2 { color:var(--danger); font-size:38px; }
-    #alarm button { margin-top:20px; background:var(--danger); font-size:22px; }
+    #alarm h2 { color:var(--danger); font-size:38px; margin:0 0 10px; }
+    #alarm p { color:#fff; opacity:0.9; margin:0 0 18px; }
+    #alarm .alarm-actions { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    #alarm .alarm-actions button { width:auto; padding:14px 22px; border-radius:14px; font-size:18px; }
+    #dismissBtn { background:var(--danger); }
+    #snoozeBtn { background:#3a3a3c; }
 
+    /* Toast */
     .toast {
-      position:fixed;
-      bottom:30px;
-      left:50%;
-      transform:translateX(-50%);
-      background:#2c2c2e;
-      padding:10px 20px;
-      border-radius:16px;
-      opacity:0;
-      transition:.3s;
+      position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(10px);
+      background:#2c2c2e; color:#fff; padding:10px 18px; border-radius:16px;
+      opacity:0; transition:.25s; pointer-events:none; z-index:1000;
     }
-    .toast.show { opacity:1; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   </style>
 </head>
 
@@ -117,87 +90,33 @@
 <div class="container">
   <h1>Reminders</h1>
 
-  <div class="warning">
-    ⚠️ Alarm beeps only while app is open. Push will come later.
-  </div>
+  <div class="warning">⚠️ Alarm beeps only while the app is open. (Later we’ll add Push for closed-app alerts.)</div>
 
   <div class="input-group">
     <label>What?</label>
-    <input id="task" placeholder="Memo name…" />
+    <input id="task" type="text" placeholder="Memo name…" />
 
     <label>When?</label>
-    <input id="time" type="datetime-local" />
+    <button class="pickerBtn" id="timeBtn" onclick="openTimePicker()">
+      Tap to choose date & time
+      <span class="sub" id="timeSub">No time selected</span>
+    </button>
 
-    <button class="record" onclick="record()">🎤 Record</button>
-    <button onclick="save()">Save</button>
+    <!-- Hidden native iOS picker -->
+    <input id="time" type="datetime-local" style="position:absolute; left:-9999px; width:1px; height:1px;" />
+
+    <div class="row" style="margin-top:6px;">
+      <button id="recBtn" class="record" onclick="toggleRecording()">🎤 Record</button>
+      <button onclick="save()">Save</button>
+    </div>
   </div>
 
   <div class="list" id="list"></div>
 </div>
 
+<!-- Alarm -->
 <div id="alarm">
   <h2 id="alarmTitle"></h2>
-  <button onclick="stop()">DISMISS</button>
-</div>
+  <p id="alarmTime"></p>
 
-<div class="toast" id="toast"></div>
-
-<script>
-const KEY="rems_v3";
-let audioCtx, beep, recorder, chunks=[], voice=null;
-
-const toastEl=document.getElementById("toast");
-const toast=m=>{toastEl.innerText=m;toastEl.classList.add("show");setTimeout(()=>toastEl.classList.remove("show"),2000)};
-
-function save(){
-  if(!time.value){toast("Pick date & time");return}
-  const r={id:Date.now(),t:task.value||"Reminder",ms:new Date(time.value).getTime()};
-  const a=JSON.parse(localStorage.getItem(KEY)||"[]"); a.push(r);
-  localStorage.setItem(KEY,JSON.stringify(a));
-  task.value=""; time.value="";
-  toast("Saved ✅"); render();
-}
-
-function render(){
-  list.innerHTML="";
-  const a=JSON.parse(localStorage.getItem(KEY)||"[]").sort((x,y)=>x.ms-y.ms);
-  a.forEach(r=>{
-    list.innerHTML+=`<div class="item"><b>${r.t}</b><div class="time">${new Date(r.ms).toLocaleString()}</div></div>`;
-  });
-}
-
-function tick(){
-  const a=JSON.parse(localStorage.getItem(KEY)||"[]");
-  const n=Date.now();
-  const r=a.find(x=>x.ms<=n);
-  if(!r) return;
-  localStorage.setItem(KEY,JSON.stringify(a.filter(x=>x.id!==r.id)));
-  alarmTitle.innerText=r.t;
-  alarm.style.display="flex";
-  audioCtx=new AudioContext();
-  beep=setInterval(()=>{
-    const o=audioCtx.createOscillator();
-    o.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+.3);
-  },600);
-}
-
-function stop(){
-  clearInterval(beep); alarm.style.display="none"; render();
-}
-
-async function record(){
-  if(recorder&&recorder.state==="recording"){ recorder.stop(); return; }
-  const s=await navigator.mediaDevices.getUserMedia({audio:true});
-  recorder=new MediaRecorder(s);
-  chunks=[];
-  recorder.ondataavailable=e=>chunks.push(e.data);
-  recorder.onstop=()=>{voice=new Blob(chunks); toast("Voice saved 🎤")};
-  recorder.start(); toast("Recording…");
-}
-
-setInterval(tick,1000);
-render();
-</script>
-</body>
-</html>
-``
+  <div class="alarm-actions">
