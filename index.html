@@ -25,20 +25,21 @@ body {
   justify-content:center;
 }
 
-.container {
-  width:100%;
-  max-width:420px;
-}
+.container { width:100%; max-width:420px; }
 
-h1 {
-  margin:40px 0 16px;
-  font-size:32px;
-}
+h1 { margin:40px 0 16px; font-size:32px; }
 
 .card {
   background:var(--card);
   padding:20px;
   border-radius:24px;
+}
+
+label {
+  display:block;
+  font-size:13px;
+  color:#8e8e93;
+  margin-bottom:6px;
 }
 
 textarea, input, button {
@@ -96,16 +97,8 @@ button {
   text-align:center;
 }
 
-#alarm h2 {
-  color:var(--danger);
-  font-size:38px;
-}
-
-#alarm button {
-  margin-top:12px;
-  width:auto;
-  padding:14px 32px;
-}
+#alarm h2 { color:var(--danger); font-size:38px; }
+#alarm button { margin-top:12px; width:auto; padding:14px 32px; }
 </style>
 </head>
 
@@ -114,9 +107,10 @@ button {
   <h1>Reminders</h1>
 
   <div class="card">
-    <textarea id="task" placeholder="Memo…"></textarea>
+    <label>Memo</label>
+    <textarea id="task" placeholder="Write a note…"></textarea>
 
-    <!-- Native iOS date + time -->
+    <label>Date & Time</label>
     <input id="time" type="datetime-local">
 
     <button id="startRec" class="danger">🎤 Start recording</button>
@@ -135,21 +129,31 @@ button {
 </div>
 
 <script>
-/* ---------------- State ---------------- */
-const STORAGE_KEY = "reminders_v1";
+/* ================= STATE ================= */
+const STORAGE_KEY = "reminders_v2";
 let mediaRecorder = null;
-let audioChunks = [];
+let audioCtx = null;
 let beepTimer = null;
 let currentAlarm = null;
 
-/* ---------------- Recording ---------------- */
+/* ================= AUDIO UNLOCK (CRITICAL) ================= */
+function unlockAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+document.addEventListener("click", unlockAudio, { once:true });
+document.addEventListener("touchstart", unlockAudio, { once:true });
+
+/* ================= RECORDING ================= */
 startRec.onclick = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
     mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
 
-    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
     mediaRecorder.onstop = () => stream.getTracks().forEach(t => t.stop());
 
     mediaRecorder.start();
@@ -168,7 +172,7 @@ stopRec.onclick = () => {
   stopRec.disabled = true;
 };
 
-/* ---------------- Save ---------------- */
+/* ================= SAVE ================= */
 saveBtn.onclick = () => {
   if (!time.value) {
     alert("Please choose date & time");
@@ -191,7 +195,7 @@ saveBtn.onclick = () => {
   render();
 };
 
-/* ---------------- Render ---------------- */
+/* ================= RENDER ================= */
 function render() {
   const list = document.getElementById("list");
   const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
@@ -210,7 +214,7 @@ function render() {
   });
 }
 
-/* ---------------- Alarm ---------------- */
+/* ================= ALARM ================= */
 setInterval(() => {
   const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   const now = Date.now();
@@ -227,33 +231,9 @@ setInterval(() => {
 }, 1000);
 
 function triggerAlarm(text) {
+  unlockAudio();   // ✅ THIS IS THE FIX
+
   currentAlarm = text;
   alarmText.textContent = text;
   alarm.style.display = "flex";
 
-  beepTimer = setInterval(() => {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + .3);
-  }, 600);
-}
-
-dismissBtn.onclick = () => {
-  clearInterval(beepTimer);
-  alarm.style.display = "none";
-};
-
-snoozeBtn.onclick = () => {
-  clearInterval(beepTimer);
-  alarm.style.display = "none";
-  setTimeout(() => triggerAlarm(currentAlarm), 5 * 60 * 1000);
-};
-
-/* Boot */
-render();
-</script>
-</body>
-</html>
-``
