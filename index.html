@@ -82,7 +82,7 @@
 <body>
   <div class="container">
     <h1>Reminders</h1>
-    <div class="build">Build: <b>voice-fix-2026-03-30</b></div>
+    <div class="build">Build: <b>push-step3-fixed</b></div>
 
     <div class="card">
       <label>Memo</label>
@@ -101,6 +101,7 @@
 
       <button id="saveBtn" type="button">Save</button>
       <button id="enableNotifBtn" class="secondary" type="button">🔔 Enable Notifications</button>
+
       <div class="hint">
         Tip: record → stop → you’ll see the player → then press Save.
       </div>
@@ -122,10 +123,6 @@
 
 <script>
 (() => {
-  // =========================================================
-  // 1) SIMPLE REMINDERS + FIXED VOICE RECORDING
-  // =========================================================
-
   const STORAGE_KEY = "reminders_stable_v2";
   const DB_NAME  = "reminders_audio_db_v1";
   const DB_STORE = "audio";
@@ -140,6 +137,7 @@
   const startRecBtn = $("startRec");
   const stopRecBtn  = $("stopRec");
   const saveBtn     = $("saveBtn");
+  const enableNotifBtn = $("enableNotifBtn");
 
   const previewEl   = $("preview");
 
@@ -166,7 +164,7 @@
   setInterval(updateMin, 60000);
 
   // =========================================================
-  // 2) IndexedDB (audio storage)
+  // IndexedDB (audio storage)
   // =========================================================
   function openDb(){
     return new Promise((resolve, reject) => {
@@ -213,7 +211,7 @@
   }
 
   // =========================================================
-  // 3) Reminders storage
+  // Reminders storage
   // =========================================================
   function getAll(){
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -229,7 +227,7 @@
   }
 
   // =========================================================
-  // 4) Render list
+  // Render list
   // =========================================================
   async function playAudio(audioId){
     try{
@@ -241,7 +239,6 @@
       previewEl.style.display = "block";
       previewEl.play?.();
       toast("Playing voice note");
-
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch(e){
       console.error(e);
@@ -279,7 +276,6 @@
     const all = getAll();
     const item = all.find(x => x.id === id);
     setAll(all.filter(r => r.id !== id));
-
     if(item?.audioId){
       await idbDel(item.audioId).catch(()=>{});
     }
@@ -288,29 +284,19 @@
   };
 
   // =========================================================
-  // 5) Save reminder (attach audio if exists)
+  // Save reminder (attach audio if exists)
   // =========================================================
   let lastAudioId = null;
 
   saveBtn.addEventListener("click", () => {
     const timeValue = timeEl.value;
-    if(!timeValue){
-      toast("Choose Date & Time");
-      return;
-    }
+    if(!timeValue){ toast("Choose Date & Time"); return; }
+
     const ms = new Date(timeValue).getTime();
-    if(ms <= Date.now()){
-      toast("Pick a future time");
-      return;
-    }
+    if(ms <= Date.now()){ toast("Pick a future time"); return; }
 
     const text = taskEl.value.trim() || "Reminder";
-    const reminder = {
-      id: Date.now(),
-      text,
-      timeMs: ms,
-      audioId: lastAudioId || null
-    };
+    const reminder = { id: Date.now(), text, timeMs: ms, audioId: lastAudioId || null };
 
     const all = getAll();
     all.push(reminder);
@@ -328,7 +314,7 @@
   });
 
   // =========================================================
-  // 6) Alarm overlay (works ONLY while app is open)
+  // Alarm overlay (works ONLY while app is open)
   // =========================================================
   let audioCtx = null;
   let beepInterval = null;
@@ -358,7 +344,6 @@
       osc.stop(audioCtx.currentTime + 0.3);
     }, 600);
   }
-
   function stopBeep(){
     if(beepInterval){ clearInterval(beepInterval); beepInterval = null; }
   }
@@ -378,10 +363,7 @@
     alarmActive = false;
   }
 
-  dismissBtn.addEventListener("click", () => {
-    hideAlarm();
-    render();
-  });
+  dismissBtn.addEventListener("click", () => { hideAlarm(); render(); });
 
   snoozeBtn.addEventListener("click", () => {
     hideAlarm();
@@ -405,19 +387,18 @@
   }, 1000);
 
   // =========================================================
-  // 7) VOICE RECORDING (FIXED)
+  // Voice recording (fixed)
   // =========================================================
   let mediaRecorder = null;
   let streamRef = null;
   let chunks = [];
 
   function pickMime(){
-    // iPhone usually supports audio/mp4. Some environments support webm.
     const candidates = ["audio/mp4", "audio/webm"];
     for(const t of candidates){
       if(window.MediaRecorder?.isTypeSupported?.(t)) return t;
     }
-    return ""; // browser chooses
+    return "";
   }
 
   startRecBtn.addEventListener("click", async () => {
@@ -465,13 +446,11 @@
         }
       };
 
-      // timeslice helps iPhone actually generate data chunks
       mediaRecorder.start(250);
 
       startRecBtn.disabled = true;
       stopRecBtn.disabled = false;
       toast("Recording…");
-
     } catch(e){
       console.error(e);
       toast("Mic permission blocked");
@@ -490,88 +469,73 @@
     }
   });
 
+  // =========================================================
+  // Service Worker registration (must exist for push)
+  // =========================================================
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js")
+        .then(() => console.log("Service Worker registered"))
+        .catch((err) => console.error("Service Worker error", err));
+    });
+  }
+
+  // =========================================================
+  // Push Notifications (Permission + Subscribe)
+  // On iOS: permission prompt must be triggered by user tap [1](https://academy.insiderone.com/docs/web-push-support-for-mobile-safari)[2](https://www.developer-tech.com/news/ios-16-4-supports-web-app-notifications/)
+  // =========================================================
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  const VAPID_PUBLIC_KEY = "PASTE_PUBLIC_KEY_HERE";
+  const SERVER_URL = "PASTE_SERVER_URL_HERE";
+
+  async function subscribeToPush() {
+    // until Step 4, stop here with a clear message
+    if (VAPID_PUBLIC_KEY.includes("PASTE_") || SERVER_URL.includes("PASTE_")) {
+      toast("Step 4 needed: server not configured yet");
+      return;
+    }
+
+    if (!("serviceWorker" in navigator)) { toast("Service Worker not supported"); return; }
+    if (!("PushManager" in window)) { toast("Push not supported on this iPhone"); return; }
+
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Notifications not allowed"); return; }
+
+    const reg = await navigator.serviceWorker.ready;
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+
+    await fetch(`${SERVER_URL}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub)
+    });
+
+    toast("Notifications enabled ✅");
+  }
+
+  enableNotifBtn.addEventListener("click", () => {
+    subscribeToPush().catch(err => {
+      console.error(err);
+      toast("Could not enable notifications");
+    });
+  });
+
   // boot
   render();
 })();
 </script>
-<script>
-  // ===============================
-// Push Notifications (Permission + Subscribe)
-// ===============================
-const enableNotifBtn = document.getElementById("enableNotifBtn");
 
-// helper: convert base64 public key to Uint8Array (required by Web Push)
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-  return outputArray;
-}
-
-// IMPORTANT: we will fill this in Step 4 (server will give you this key)
-const VAPID_PUBLIC_KEY = "PASTE_PUBLIC_KEY_HERE";
-
-// Your server URL (we will create in Step 4)
-const SERVER_URL = "PASTE_SERVER_URL_HERE"; // example: https://your-worker.yourname.workers.dev
-
-async function subscribeToPush() {
-  if (!("serviceWorker" in navigator)) {
-    toast("Service Worker not supported");
-    return;
-  }
-  if (!("PushManager" in window)) {
-    toast("Push not supported on this iPhone");
-    return;
-  }
-
-  // 1) Ask permission (must be user button tap) [1](https://academy.insiderone.com/docs/web-push-support-for-mobile-safari)[2](https://www.developer-tech.com/news/ios-16-4-supports-web-app-notifications/)
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") {
-    toast("Notifications not allowed");
-    return;
-  }
-
-  // 2) Get service worker registration
-  const reg = await navigator.serviceWorker.ready;
-
-  // 3) Subscribe
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-  });
-
-  // 4) Send subscription to your server so it can notify you later
-  await fetch(`${SERVER_URL}/subscribe`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(sub)
-  });
-
-  toast("Notifications enabled ✅");
-}
-
-enableNotifBtn?.addEventListener("click", () => {
-  subscribeToPush().catch(err => {
-    console.error(err);
-    toast("Could not enable notifications");
-  });
-});
-``
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js")
-        .then(() => {
-          console.log("Service Worker registered");
-        })
-        .catch((err) => {
-          console.error("Service Worker error", err);
-        });
-    });
-  }
-</script>
-``
 </body>
 </html>
-``
