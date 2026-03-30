@@ -120,3 +120,380 @@
   <div class="toast" id="toast"></div>
 
 <script>
+(() => {
+  // =========================================================
+  // 1) SIMPLE REMINDERS + FIXED VOICE RECORDING
+  // =========================================================
+
+  const STORAGE_KEY = "reminders_stable_v2";
+  const DB_NAME  = "reminders_audio_db_v1";
+  const DB_STORE = "audio";
+
+  const $ = (id) => document.getElementById(id);
+
+  const taskEl = $("task");
+  const timeEl = $("time");
+  const listEl = $("list");
+  const toastEl = $("toast");
+
+  const startRecBtn = $("startRec");
+  const stopRecBtn  = $("stopRec");
+  const saveBtn     = $("saveBtn");
+
+  const previewEl   = $("preview");
+
+  const alarmEl     = $("alarm");
+  const alarmTitle  = $("alarmTitle");
+  const alarmTime   = $("alarmTime");
+  const snoozeBtn   = $("snoozeBtn");
+  const dismissBtn  = $("dismissBtn");
+
+  // ---------- Toast
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(() => toastEl.classList.remove("show"), 2200);
+  }
+
+  // ---------- Set min datetime to now
+  function updateMin(){
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    timeEl.min = local;
+  }
+  updateMin();
+  setInterval(updateMin, 60000);
+
+  // =========================================================
+  // 2) IndexedDB (audio storage)
+  // =========================================================
+  function openDb(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(DB_STORE)){
+          db.createObjectStore(DB_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbSet(key, blob){
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(blob, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function idbGet(key){
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readonly");
+      const req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbDel(key){
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // =========================================================
+  // 3) Reminders storage
+  // =========================================================
+  function getAll(){
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  }
+  function setAll(arr){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  // =========================================================
+  // 4) Render list
+  // =========================================================
+  async function playAudio(audioId){
+    try{
+      const blob = await idbGet(audioId);
+      if(!blob){ toast("Voice note not found"); return; }
+
+      const url = URL.createObjectURL(blob);
+      previewEl.src = url;
+      previewEl.style.display = "block";
+      previewEl.play?.();
+      toast("Playing voice note");
+
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch(e){
+      console.error(e);
+      toast("Could not play audio");
+    }
+  }
+
+  function render(){
+    const all = getAll().sort((a,b)=>a.timeMs-b.timeMs);
+    if(all.length === 0){
+      listEl.innerHTML = `<p style="text-align:center;color:#8e8e93;margin-top:18px;">No reminders yet.</p>`;
+      return;
+    }
+
+    listEl.innerHTML = all.map(r => `
+      <div class="item">
+        <div class="itemHead">
+          <div style="flex:1;">
+            <strong>${escapeHtml(r.text)}</strong>
+            <div class="time">${new Date(r.timeMs).toLocaleString()}</div>
+
+            <div class="itemButtons">
+              ${r.audioId ? `<button class="btnSmall" type="button" onclick="window.__play('${r.audioId}')">▶︎ Play voice</button>` : ``}
+              <button class="btnSmall" type="button" onclick="window.__del(${r.id})">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  window.__play = (audioId) => playAudio(audioId);
+
+  window.__del = async (id) => {
+    const all = getAll();
+    const item = all.find(x => x.id === id);
+    setAll(all.filter(r => r.id !== id));
+
+    if(item?.audioId){
+      await idbDel(item.audioId).catch(()=>{});
+    }
+    toast("Deleted");
+    render();
+  };
+
+  // =========================================================
+  // 5) Save reminder (attach audio if exists)
+  // =========================================================
+  let lastAudioId = null;
+
+  saveBtn.addEventListener("click", () => {
+    const timeValue = timeEl.value;
+    if(!timeValue){
+      toast("Choose Date & Time");
+      return;
+    }
+    const ms = new Date(timeValue).getTime();
+    if(ms <= Date.now()){
+      toast("Pick a future time");
+      return;
+    }
+
+    const text = taskEl.value.trim() || "Reminder";
+    const reminder = {
+      id: Date.now(),
+      text,
+      timeMs: ms,
+      audioId: lastAudioId || null
+    };
+
+    const all = getAll();
+    all.push(reminder);
+    setAll(all);
+
+    taskEl.value = "";
+    timeEl.value = "";
+    lastAudioId = null;
+
+    previewEl.style.display = "none";
+    previewEl.src = "";
+
+    toast("Saved ✅");
+    render();
+  });
+
+  // =========================================================
+  // 6) Alarm overlay (works ONLY while app is open)
+  // =========================================================
+  let audioCtx = null;
+  let beepInterval = null;
+  let alarmActive = false;
+  let currentAlarmText = "";
+
+  function ensureAudio(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+  }
+  window.addEventListener("touchstart", ensureAudio, { once:true });
+  window.addEventListener("click", ensureAudio, { once:true });
+
+  function startBeep(){
+    ensureAudio();
+    if(beepInterval) return;
+    beepInterval = setInterval(() => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    }, 600);
+  }
+
+  function stopBeep(){
+    if(beepInterval){ clearInterval(beepInterval); beepInterval = null; }
+  }
+
+  function showAlarm(text, ms){
+    alarmActive = true;
+    currentAlarmText = text;
+    alarmTitle.textContent = text;
+    alarmTime.textContent = new Date(ms).toLocaleString();
+    alarmEl.style.display = "flex";
+    startBeep();
+  }
+
+  function hideAlarm(){
+    stopBeep();
+    alarmEl.style.display = "none";
+    alarmActive = false;
+  }
+
+  dismissBtn.addEventListener("click", () => {
+    hideAlarm();
+    render();
+  });
+
+  snoozeBtn.addEventListener("click", () => {
+    hideAlarm();
+    const all = getAll();
+    all.push({ id: Date.now(), text: currentAlarmText, timeMs: Date.now() + 5*60*1000 });
+    setAll(all);
+    toast("Snoozed 5 min");
+    render();
+  });
+
+  setInterval(() => {
+    if(alarmActive) return;
+    const all = getAll();
+    const now = Date.now();
+    const due = all.filter(r => r.timeMs <= now).sort((a,b)=>a.timeMs-b.timeMs)[0];
+    if(!due) return;
+
+    setAll(all.filter(r => r.id !== due.id));
+    render();
+    showAlarm(due.text, due.timeMs);
+  }, 1000);
+
+  // =========================================================
+  // 7) VOICE RECORDING (FIXED)
+  // =========================================================
+  let mediaRecorder = null;
+  let streamRef = null;
+  let chunks = [];
+
+  function pickMime(){
+    // iPhone usually supports audio/mp4. Some environments support webm.
+    const candidates = ["audio/mp4", "audio/webm"];
+    for(const t of candidates){
+      if(window.MediaRecorder?.isTypeSupported?.(t)) return t;
+    }
+    return ""; // browser chooses
+  }
+
+  startRecBtn.addEventListener("click", async () => {
+    try{
+      chunks = [];
+      lastAudioId = null;
+
+      streamRef = await navigator.mediaDevices.getUserMedia({ audio:true });
+
+      const mime = pickMime();
+      const options = mime ? { mimeType: mime } : undefined;
+
+      mediaRecorder = new MediaRecorder(streamRef, options);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if(e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        try{
+          streamRef?.getTracks?.().forEach(t => t.stop());
+          streamRef = null;
+
+          const finalType = mediaRecorder.mimeType || mime || "audio/mp4";
+          const blob = new Blob(chunks, { type: finalType });
+          chunks = [];
+
+          if(!blob || blob.size === 0){
+            toast("No audio saved. Try again.");
+            return;
+          }
+
+          lastAudioId = "aud_" + Date.now();
+          await idbSet(lastAudioId, blob);
+
+          const url = URL.createObjectURL(blob);
+          previewEl.src = url;
+          previewEl.style.display = "block";
+
+          toast("Voice note ready ✅");
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch(err){
+          console.error(err);
+          toast("Could not save audio");
+        }
+      };
+
+      // timeslice helps iPhone actually generate data chunks
+      mediaRecorder.start(250);
+
+      startRecBtn.disabled = true;
+      stopRecBtn.disabled = false;
+      toast("Recording…");
+
+    } catch(e){
+      console.error(e);
+      toast("Mic permission blocked");
+    }
+  });
+
+  stopRecBtn.addEventListener("click", () => {
+    try{
+      if(mediaRecorder && mediaRecorder.state === "recording"){
+        mediaRecorder.stop();
+      }
+    } finally {
+      startRecBtn.disabled = false;
+      stopRecBtn.disabled = true;
+      toast("Stopped");
+    }
+  });
+
+  // boot
+  render();
+})();
+</script>
+
+</body>
+</html>
+``
