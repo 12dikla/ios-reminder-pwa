@@ -100,6 +100,7 @@
       </div>
 
       <button id="saveBtn" type="button">Save</button>
+      <button id="enableNotifBtn" class="secondary" type="button">🔔 Enable Notifications</button>
       <div class="hint">
         Tip: record → stop → you’ll see the player → then press Save.
       </div>
@@ -494,6 +495,70 @@
 })();
 </script>
 <script>
+  // ===============================
+// Push Notifications (Permission + Subscribe)
+// ===============================
+const enableNotifBtn = document.getElementById("enableNotifBtn");
+
+// helper: convert base64 public key to Uint8Array (required by Web Push)
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+// IMPORTANT: we will fill this in Step 4 (server will give you this key)
+const VAPID_PUBLIC_KEY = "PASTE_PUBLIC_KEY_HERE";
+
+// Your server URL (we will create in Step 4)
+const SERVER_URL = "PASTE_SERVER_URL_HERE"; // example: https://your-worker.yourname.workers.dev
+
+async function subscribeToPush() {
+  if (!("serviceWorker" in navigator)) {
+    toast("Service Worker not supported");
+    return;
+  }
+  if (!("PushManager" in window)) {
+    toast("Push not supported on this iPhone");
+    return;
+  }
+
+  // 1) Ask permission (must be user button tap) [1](https://academy.insiderone.com/docs/web-push-support-for-mobile-safari)[2](https://www.developer-tech.com/news/ios-16-4-supports-web-app-notifications/)
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") {
+    toast("Notifications not allowed");
+    return;
+  }
+
+  // 2) Get service worker registration
+  const reg = await navigator.serviceWorker.ready;
+
+  // 3) Subscribe
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+
+  // 4) Send subscription to your server so it can notify you later
+  await fetch(`${SERVER_URL}/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(sub)
+  });
+
+  toast("Notifications enabled ✅");
+}
+
+enableNotifBtn?.addEventListener("click", () => {
+  subscribeToPush().catch(err => {
+    console.error(err);
+    toast("Could not enable notifications");
+  });
+});
+``
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js")
