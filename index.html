@@ -82,7 +82,7 @@
 <body>
   <div class="container">
     <h1>Reminders</h1>
-    <div class="build">Build: <b>push-step3-fixed</b></div>
+    <div class="build">Build: <b>push-step4-ready</b></div>
 
     <div class="card">
       <label>Memo</label>
@@ -123,9 +123,12 @@
 
 <script>
 (() => {
-  const STORAGE_KEY = "reminders_stable_v2";
+  const STORAGE_KEY = "reminders_stable_v3";
   const DB_NAME  = "reminders_audio_db_v1";
   const DB_STORE = "audio";
+
+  // ✅ Your Worker URL (already deployed in Cloudflare)
+  const SERVER_URL = "https://ios-reminder-worker.dikla12.workers.dev";
 
   const $ = (id) => document.getElementById(id);
 
@@ -162,6 +165,16 @@
   }
   updateMin();
   setInterval(updateMin, 60000);
+
+  // ---------- deviceId (stable)
+  function getDeviceId(){
+    let deviceId = localStorage.getItem("deviceId");
+    if(!deviceId){
+      deviceId = "dev_" + Math.random().toString(16).slice(2) + Date.now();
+      localStorage.setItem("deviceId", deviceId);
+    }
+    return deviceId;
+  }
 
   // =========================================================
   // IndexedDB (audio storage)
@@ -259,7 +272,6 @@
           <div style="flex:1;">
             <strong>${escapeHtml(r.text)}</strong>
             <div class="time">${new Date(r.timeMs).toLocaleString()}</div>
-
             <div class="itemButtons">
               ${r.audioId ? `<button class="btnSmall" type="button" onclick="window.__play('${r.audioId}')">▶︎ Play voice</button>` : ``}
               <button class="btnSmall" type="button" onclick="window.__del(${r.id})">Delete</button>
@@ -284,7 +296,7 @@
   };
 
   // =========================================================
-  // Save reminder (attach audio if exists)
+  // Save reminder (attach audio if exists) + send to server
   // =========================================================
   let lastAudioId = null;
 
@@ -298,9 +310,18 @@
     const text = taskEl.value.trim() || "Reminder";
     const reminder = { id: Date.now(), text, timeMs: ms, audioId: lastAudioId || null };
 
+    // local save (UI)
     const all = getAll();
     all.push(reminder);
     setAll(all);
+
+    // send to server so it can notify when phone is locked
+    const deviceId = getDeviceId();
+    fetch(`${SERVER_URL}/reminder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, id: reminder.id, text: reminder.text, timeMs: reminder.timeMs })
+    }).catch(()=>{});
 
     taskEl.value = "";
     timeEl.value = "";
@@ -470,7 +491,7 @@
   });
 
   // =========================================================
-  // Service Worker registration (must exist for push)
+  // Service Worker registration
   // =========================================================
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
@@ -482,7 +503,6 @@
 
   // =========================================================
   // Push Notifications (Permission + Subscribe)
-  // On iOS: permission prompt must be triggered by user tap [1](https://academy.insiderone.com/docs/web-push-support-for-mobile-safari)[2](https://www.developer-tech.com/news/ios-16-4-supports-web-app-notifications/)
   // =========================================================
   function urlBase64ToUint8Array(base64String) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -493,16 +513,16 @@
     return outputArray;
   }
 
-  const VAPID_PUBLIC_KEY = "PASTE_PUBLIC_KEY_HERE";
-  const SERVER_URL = "https://ios-reminder-worker.dikla12.workers.dev";
+  let VAPID_PUBLIC_KEY = "";
+  async function getPublicKey(){
+    if (VAPID_PUBLIC_KEY) return VAPID_PUBLIC_KEY;
+    const r = await fetch(`${SERVER_URL}/public-key`);
+    const j = await r.json();
+    VAPID_PUBLIC_KEY = j.publicKey;
+    return VAPID_PUBLIC_KEY;
+  }
 
   async function subscribeToPush() {
-    // until Step 4, stop here with a clear message
-    if (VAPID_PUBLIC_KEY.includes("PASTE_") || SERVER_URL.includes("PASTE_")) {
-      toast("Step 4 needed: server not configured yet");
-      return;
-    }
-
     if (!("serviceWorker" in navigator)) { toast("Service Worker not supported"); return; }
     if (!("PushManager" in window)) { toast("Push not supported on this iPhone"); return; }
 
@@ -513,13 +533,15 @@
 
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      applicationServerKey: urlBase64ToUint8Array(await getPublicKey())
     });
+
+    const deviceId = getDeviceId();
 
     await fetch(`${SERVER_URL}/subscribe`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sub)
+      body: JSON.stringify({ deviceId, subscription: sub })
     });
 
     toast("Notifications enabled ✅");
